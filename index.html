@@ -437,7 +437,10 @@ input:checked+.toggle-track::before{transform:translateX(18px);}
     <div class="user-avatar" id="userAvatar" onclick="toggleUserMenu()">?</div>
     <div id="userMenu" style="display:none;position:absolute;top:52px;right:1rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.4rem;z-index:200;min-width:160px;">
       <div style="padding:.5rem .8rem;font-size:.82rem;color:var(--text-muted);border-bottom:1px solid var(--border);margin-bottom:.3rem;" id="userMenuName"></div>
+      <div style="padding:.28rem .8rem;font-size:.73rem;color:var(--text-dim);display:flex;align-items:center;gap:.35rem;" id="userMenuRoom">🔑 <span id="userMenuRoomCode">—</span></div>
       <button onclick="goPage('orders');closeUserMenu()" style="display:block;width:100%;background:transparent;border:none;color:var(--text);font-family:'Sarabun',sans-serif;padding:.4rem .7rem;cursor:pointer;border-radius:6px;text-align:left;font-size:.85rem;" id="menuMyOrders">📦 ออเดอร์ของฉัน</button>
+      <button onclick="changeRoom()" style="display:block;width:100%;background:transparent;border:none;color:var(--accent);font-family:'Sarabun',sans-serif;padding:.4rem .7rem;cursor:pointer;border-radius:6px;text-align:left;font-size:.85rem;" id="menuChangeRoom">🔄 เปลี่ยนร้านค้า</button>
+      <div style="height:1px;background:var(--border);margin:.3rem 0;"></div>
       <button onclick="signOut()" style="display:block;width:100%;background:transparent;border:none;color:var(--red);font-family:'Sarabun',sans-serif;padding:.4rem .7rem;cursor:pointer;border-radius:6px;text-align:left;font-size:.85rem;" id="menuSignOut">🚪 ออกจากระบบ</button>
     </div>
   </div>
@@ -1218,12 +1221,34 @@ async function doAdminLogin(){
 window.doAdminLogin = doAdminLogin;
 
 async function signOut(){
+  localStorage.removeItem('shopRoom'); // clear saved room on signout
+  sessionStorage.clear();
   await auth.signOut();
   currentUser=null; isAdmin=false; currentRoom=null;
   cart={}; allProducts={}; categories=[]; storeConfig={}; allOrders={}; myOrders={};
   window.location.reload();
 }
 window.signOut = signOut;
+
+function changeRoom(){
+  // ออกจาก room ปัจจุบัน แต่ยังคง login อยู่
+  closeUserMenu();
+  if(!confirm('เปลี่ยนร้านค้า? คุณจะต้องกรอก Room Code ใหม่')) return;
+  localStorage.removeItem('shopRoom');
+  sessionStorage.clear();
+  currentRoom = null;
+  // ซ่อน app แสดงหน้าเลือก room ใหม่
+  document.getElementById('appHeader').classList.remove('show');
+  document.getElementById('bottomNav').classList.remove('show');
+  document.getElementById('mainWrap').style.display='none';
+  // unsubscribe firebase listeners
+  try { db.ref().off(); } catch(e){}
+  // reset state
+  cart={}; allProducts={}; categories=[]; storeConfig={}; myOrders={};
+  // show room selector again
+  showRoomSelector();
+}
+window.changeRoom = changeRoom;
 
 /* ============================================================
    ENTER APP
@@ -1339,6 +1364,9 @@ function enterCustomerApp(){
   subscribeData();
   applyLang();
   initStatusTracking();
+  // show room code in user menu
+  const rmc = document.getElementById('userMenuRoomCode');
+  if(rmc) rmc.textContent = currentRoom || '—';
   // restore last page after refresh
   const lastPage = sessionStorage.getItem('lastPage')||'shop';
   if(lastPage && lastPage!=='shop') goPage(lastPage);
